@@ -2,19 +2,19 @@ use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Layout},
+    style::{Color, Stylize},
     widgets::{Block, Borders, Paragraph},
 };
 
-use crate::{
-    data_io::csv::CsvIoHandler,
-    logic::{self, cards_logic::CardsLogic},
-};
+use crate::{data_io::csv::CsvIoHandler, logic::cards_logic::CardsLogic};
 
 pub struct Cards {
     card_logic_current_state: CardsLogic<CsvIoHandler>,
     display_original: bool,
     display_translation: bool,
     display_description: bool,
+    current_string: String,
+    current_string_matching: bool,
 }
 
 impl Cards {
@@ -27,6 +27,8 @@ impl Cards {
             display_original: true,
             display_translation: false,
             display_description: true,
+            current_string: String::new(),
+            current_string_matching: false,
         }
     }
 
@@ -47,6 +49,8 @@ impl Cards {
                     (KeyCode::Char('q'), KeyModifiers::CONTROL) => break Ok(()),
                     (KeyCode::Char('n'), KeyModifiers::CONTROL) => {
                         self.card_logic_current_state.increment_current_entry();
+                        self.current_string_matching = false;
+                        self.current_string = String::new();
                     }
                     (KeyCode::Char('t'), KeyModifiers::CONTROL) => {
                         self.display_translation = !self.display_translation;
@@ -56,6 +60,30 @@ impl Cards {
                     }
                     (KeyCode::Char('o'), KeyModifiers::CONTROL) => {
                         self.display_original = !self.display_original;
+                    }
+                    (KeyCode::Backspace, KeyModifiers::NONE) => {
+                        self.current_string.pop();
+                        if self
+                            .card_logic_current_state
+                            .match_current_translation(self.current_string.as_str())
+                        {
+                            self.current_string_matching = true;
+                        } else {
+                            self.current_string_matching = false;
+                        }
+                    }
+                    (KeyCode::Char(character), KeyModifiers::NONE)
+                        if character.is_alphabetic() || character.is_whitespace() =>
+                    {
+                        self.current_string.push(character);
+                        if self
+                            .card_logic_current_state
+                            .match_current_translation(self.current_string.as_str())
+                        {
+                            self.current_string_matching = true;
+                        } else {
+                            self.current_string_matching = false;
+                        }
                     }
                     _ => {}
                 }
@@ -76,31 +104,54 @@ impl Cards {
             .constraints(vec![Percentage(50), Percentage(50)])
             .split(vertical[0]);
 
+        let vertical_inner = Layout::default()
+            .direction(ratatui::layout::Direction::Vertical)
+            .constraints(vec![Percentage(50), Percentage(50)])
+            .split(horizontal[1]);
+
         frame.render_widget(
             Paragraph::new(if self.display_original {
                 self.card_logic_current_state.get_current_original()
             } else {
                 "_".repeat(self.card_logic_current_state.get_current_original().len())
             })
-                .block(Block::new().borders(Borders::ALL)),
+            .block(Block::new().borders(Borders::ALL)),
             horizontal[0],
         );
         frame.render_widget(
             Paragraph::new(if self.display_translation {
                 self.card_logic_current_state.get_current_translation()
             } else {
-                "_".repeat(self.card_logic_current_state.get_current_translation().len())
+                "_".repeat(
+                    self.card_logic_current_state
+                        .get_current_translation()
+                        .len(),
+                )
             })
-                .block(Block::new().borders(Borders::ALL)),
-            horizontal[1],
+            .block(Block::new().borders(Borders::ALL)),
+            vertical_inner[0],
+        );
+        frame.render_widget(
+            Paragraph::new(self.current_string.as_str())
+                .block(Block::new().borders(Borders::ALL))
+                .fg(if self.current_string_matching {
+                    Color::Green
+                } else {
+                    Color::Red
+                }),
+            vertical_inner[1],
         );
         frame.render_widget(
             Paragraph::new(if self.display_description {
                 self.card_logic_current_state.get_current_description()
             } else {
-                "_".repeat(self.card_logic_current_state.get_current_description().len())
+                "_".repeat(
+                    self.card_logic_current_state
+                        .get_current_description()
+                        .len(),
+                )
             })
-                .block(Block::new().borders(Borders::ALL)),
+            .block(Block::new().borders(Borders::ALL)),
             vertical[1],
         );
     }

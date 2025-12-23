@@ -1,7 +1,10 @@
+use std::clone;
+
 use crate::{
     data_io::generic::{LoadData, ParseData, ReturnData, WriteData},
     structures::entry::Entry,
 };
+use unicode_segmentation::{self, UnicodeSegmentation};
 
 pub struct CardsLogic<T>
 where
@@ -31,11 +34,11 @@ where
     }
 
     pub fn match_current_translation(&self, user_string: &str) -> bool {
-        if self.current_entries[self.current_entry_index].translation == user_string {
-            return true;
-        }
-
-        return false;
+        self.current_entries[self.current_entry_index]
+            .translation
+            .split(',')
+            .map(|w| w.trim())
+            .any(|word| word == user_string.trim())
     }
 
     pub fn increment_current_entry(&mut self) {

@@ -1,8 +1,7 @@
 mod data_io;
-mod structures;
-mod logic;
 mod frontend;
-
+mod logic;
+mod structures;
 use color_eyre::Result;
 use frontend::cards::Cards;
 use std::env;
